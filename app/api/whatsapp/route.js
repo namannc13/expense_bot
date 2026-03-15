@@ -16,16 +16,15 @@ export async function POST(req) {
       .from("expenses")
       .select("*");
 
+    console.log(data)
     const total = data.reduce((s,e)=>s+e.amount,0);
+    console.log(total)
 
     twiml.message(`Total spent ₹${total}`);
 
   } else {
 
     const [amount,item,category,payment] = message.split(" ");
-    
-    console.log(amount)
-    console.log(item)
 
     const { data, error } = await supabase
         .from("expenses")
