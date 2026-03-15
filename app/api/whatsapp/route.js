@@ -23,13 +23,24 @@ export async function POST(req) {
   } else {
 
     const [amount,item,category,payment] = message.split(" ");
+    
+    console.log(amount)
+    console.log(item)
 
-    await supabase.from("expenses").insert([{
-      amount,
-      item,
-      category,
-      payment
-    }]);
+    const { data, error } = await supabase
+        .from("expenses")
+        .insert([
+            {
+            amount,
+            item,
+            category,
+            payment
+            }
+        ]);
+
+    if (error) {
+        console.log("Insert error:", error);
+    }
 
     twiml.message("Expense saved ✅");
   }
