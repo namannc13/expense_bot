@@ -1,50 +1,51 @@
-import { supabase } from "@/lib/supabase";
 import twilio from "twilio";
+import { supabase } from "@/lib/supabase";
+import { parseExpenses } from "@/lib/parser";
+import { getAnalyticsByRange } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 
 export async function POST(req) {
 
-  const formData = await req.formData();
-  const message = formData.get("Body");
+    const formData = await req.formData();
+    const message = formData.get("Body");
 
-  const twiml = new twilio.twiml.MessagingResponse();
+    const twiml = new twilio.twiml.MessagingResponse();
 
-  if (message.toLowerCase() === "get") {
+    const command = message.toLowerCase().trim();
 
-    const { data } = await supabase
-      .from("expenses")
-      .select("*");
+    if (["today", "week", "month"].includes(command)) {
 
-    console.log(data)
-    const total = data.reduce((s,e)=>s+e.amount,0);
-    console.log(total)
+        const result = await getAnalyticsByRange(command);
 
-    twiml.message(`Total spent ₹${total}`);
+        twiml.message(result);
 
-  } else {
+    }
+    else if (command === "get") {
 
-    const [amount,item,category,payment] = message.split(" ");
+        const result = await getAnalyticsByRange("month");
 
-    const { data, error } = await supabase
-        .from("expenses")
-        .insert([
-            {
-            amount,
-            item,
-            category,
-            payment
-            }
-        ]);
+        twiml.message(result);
 
-    if (error) {
-        console.log("Insert error:", error);
+    }
+    else {
+
+        const expenses = parseExpenses(message);
+
+        const { error } = await supabase
+            .from("expenses")
+            .insert(expenses);
+
+        if (error) {
+            console.error(error);
+            twiml.message("Failed to save expense ❌");
+        } else {
+            twiml.message(`Saved ${expenses.length} expense(s) ✅`);
+        }
+
     }
 
-    twiml.message("Expense saved ✅");
-  }
-
-  return new Response(twiml.toString(), {
-    headers: { "Content-Type": "text/xml" }
-  });
+    return new Response(twiml.toString(), {
+        headers: { "Content-Type": "text/xml" }
+    });
 }
