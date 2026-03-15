@@ -8,13 +8,16 @@ import {
   deleteExpense,
   undoLastExpense,
   getTopCategories,
-  getCategoryAnalytics
+  getCategoryAnalytics,
+  getSummary,
+  getDailyAverage,
+  compareMonthSpending,
+  isValidCategory,
 } from "@/lib/analytics";
 
 export const runtime = "nodejs";
 
 export async function POST(req) {
-
   const formData = await req.formData();
   const message = formData.get("Body")?.trim() || "";
 
@@ -26,14 +29,12 @@ export async function POST(req) {
   twiml.message(response);
 
   return new Response(twiml.toString(), {
-    headers: { "Content-Type": "text/xml" }
+    headers: { "Content-Type": "text/xml" },
   });
 }
 
-
 async function handleCommand(command, rawMessage) {
-
-  // range analytics
+  // analytics ranges
   if (["today", "week", "month"].includes(command)) {
     return getAnalyticsByRange(command);
   }
@@ -64,47 +65,59 @@ async function handleCommand(command, rawMessage) {
     return getTopCategories();
   }
 
-  // category analytics
-  if (isCategory(command)) {
+  // summary
+  if (command === "summary") {
+    return getSummary();
+  }
+
+  // daily average
+  if (command === "average") {
+    return getDailyAverage();
+  }
+
+  // compare months
+  if (command === "compare") {
+    return compareMonthSpending();
+  }
+
+  // dynamic category analytics
+  const categoryCheck = await isValidCategory(command);
+
+  if (categoryCheck) {
     return getCategoryAnalytics(command);
   }
 
-  // otherwise parse expenses
+  // otherwise try saving expense
   return saveExpenses(rawMessage);
 }
 
-
 async function saveExpenses(message) {
+  const parts = message.trim().split(/\s+/);
+
+  if (parts.length !== 4) {
+    return `❌ *Invalid Expense Format*
+
+Required format:
+amount item category payment
+
+Example:
+50 roll food upi`;
+  }
 
   const expenses = parseExpenses(message);
 
   if (!expenses.length) {
-    return "Invalid format ❌\nExample:\n45 auto travel upi";
+    return "❌ Could not parse expense";
   }
 
-  const { error } = await supabase
-    .from("expenses")
-    .insert(expenses);
+  const { error } = await supabase.from("expenses").insert(expenses);
 
   if (error) {
     console.error(error);
-    return "Failed to save expense ❌";
+    return "❌ Failed to save expense";
   }
 
-  return `Saved ${expenses.length} expense(s) ✅`;
-}
+  return `✅ *Expense Saved*
 
-
-function isCategory(command) {
-
-  const categories = [
-    "food",
-    "travel",
-    "shopping",
-    "entertainment",
-    "bills",
-    "health"
-  ];
-
-  return categories.includes(command);
+${expenses.length} item added`;
 }
