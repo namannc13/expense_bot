@@ -1,47 +1,22 @@
-import db from "@/lib/db";
-import { parseExpense } from "@/lib/parser";
-import { getAnalytics } from "@/lib/analytics";
 import twilio from "twilio";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 export async function POST(req) {
 
-  const body = await req.text();
-  const params = new URLSearchParams(body);
+  const formData = await req.formData();
+  const message = formData.get("Body");
 
-  const message = params.get("Body");
-
-  if (message.toLowerCase() === "get") {
-
-    const analytics = getAnalytics();
-
-    const twiml = new twilio.twiml.MessagingResponse();
-    twiml.message(analytics);
-
-    return new Response(twiml.toString(), {
-      headers: { "Content-Type": "text/xml" }
-    });
-
-  }
-
-  const expenses = parseExpense(message);
-
-  expenses.forEach(exp => {
-
-    db.prepare(`
-      INSERT INTO expenses (amount, item, category, payment)
-      VALUES (?, ?, ?, ?)
-    `).run(
-      exp.amount,
-      exp.item,
-      exp.category,
-      exp.payment
-    );
-
-  });
+  console.log("Incoming message:", message);
 
   const twiml = new twilio.twiml.MessagingResponse();
 
-  twiml.message("Expense Added ✅");
+  if (message?.toLowerCase() === "get") {
+    twiml.message("Analytics feature coming soon 📊");
+  } else {
+    twiml.message("Expense received ✅");
+  }
 
   return new Response(twiml.toString(), {
     headers: { "Content-Type": "text/xml" }
